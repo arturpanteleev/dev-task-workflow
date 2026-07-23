@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Validate required headings in workflow artifacts. This script is read-only.
+# Проверяй обязательные заголовки в артефактах workflow. Скрипт выполняет только чтение.
 
 set -u
 
 usage() {
   cat <<'EOF'
-Usage:
-  validate-artifacts.sh --task-dir <directory>
-  validate-artifacts.sh --proposal <path> --spec <path>
+Использование:
+  validate-artifacts.sh --task-dir <каталог>
+  validate-artifacts.sh --proposal <путь> --spec <путь>
 
-Checks that proposal.md and spec.md exist and contain required headings.
+Проверяет, что proposal.md и spec.md существуют и содержат обязательные заголовки.
 EOF
 }
 
@@ -20,17 +20,17 @@ spec=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task-dir)
-      [[ $# -ge 2 ]] || { echo "ERROR: --task-dir requires a directory" >&2; exit 2; }
+      [[ $# -ge 2 ]] || { echo "ОШИБКА: --task-dir требует каталог" >&2; exit 2; }
       task_dir="$2"
       shift 2
       ;;
     --proposal)
-      [[ $# -ge 2 ]] || { echo "ERROR: --proposal requires a path" >&2; exit 2; }
+      [[ $# -ge 2 ]] || { echo "ОШИБКА: --proposal требует путь" >&2; exit 2; }
       proposal="$2"
       shift 2
       ;;
     --spec)
-      [[ $# -ge 2 ]] || { echo "ERROR: --spec requires a path" >&2; exit 2; }
+      [[ $# -ge 2 ]] || { echo "ОШИБКА: --spec требует путь" >&2; exit 2; }
       spec="$2"
       shift 2
       ;;
@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "ERROR: unknown argument: $1" >&2
+      echo "ОШИБКА: неизвестный аргумент: $1" >&2
       usage >&2
       exit 2
       ;;
@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "$task_dir" ]]; then
-  [[ -z "$proposal" && -z "$spec" ]] || { echo "ERROR: do not combine --task-dir with --proposal or --spec" >&2; exit 2; }
+  [[ -z "$proposal" && -z "$spec" ]] || { echo "ОШИБКА: не сочетайте --task-dir с --proposal или --spec" >&2; exit 2; }
   proposal="$task_dir/proposal.md"
   spec="$task_dir/spec.md"
 fi
@@ -59,7 +59,7 @@ errors=0
 require_file() {
   local path="$1"
   if [[ ! -f "$path" ]]; then
-    echo "BLOCKER: missing file: $path"
+    echo "БЛОКЕР: отсутствует файл: $path"
     errors=1
     return 1
   fi
@@ -71,7 +71,7 @@ require_heading() {
   if grep -Eiq "^[[:space:]]*#{1,6}[[:space:]]+${heading}[[:space:]]*$" "$path"; then
     echo "OK: $heading"
   else
-    echo "BLOCKER: '$path' lacks heading: $heading"
+    echo "БЛОКЕР: в '$path' отсутствует заголовок: $heading"
     errors=1
   fi
 }
@@ -102,8 +102,8 @@ if [[ -f "$spec" ]]; then
 fi
 
 if [[ "$errors" -ne 0 ]]; then
-  echo "Artifact validation failed." >&2
+  echo "Проверка артефактов не пройдена." >&2
   exit 1
 fi
 
-echo "Artifact validation passed. No files were changed."
+echo "Проверка артефактов пройдена. Файлы не изменялись."

@@ -1,27 +1,24 @@
 # dev-task-workflow
 
-A portable, staged workflow for end-to-end software-development tasks.
+Переносимый поэтапный workflow для задач разработки от анализа требований до доставки изменений.
 
-It separates product analysis, technical planning, implementation, verification,
-independent code review, and delivery. The primary skill orchestrates the stages
-and retains approval gates before implementation and before Git delivery.
+Он разделяет продуктовый анализ, техническое планирование, реализацию, проверку, независимое code review и доставку. Основной skill управляет последовательностью этапов и сохраняет обязательные подтверждения перед реализацией и Git-доставкой.
 
-## Contents
+## Состав
 
-- `dev-task-workflow` — orchestrator
-- `dev-task-product-analysis`
-- `dev-task-technical-planning`
-- `dev-task-implementation`
-- `dev-task-verification`
-- `dev-task-code-review`
-- `dev-task-delivery`
+- `dev-task-workflow` — оркестратор;
+- `dev-task-product-analysis`;
+- `dev-task-technical-planning`;
+- `dev-task-implementation`;
+- `dev-task-verification`;
+- `dev-task-code-review`;
+- `dev-task-delivery`.
 
-Each skill uses the portable Agent Skills layout: a directory named after the
-skill containing `SKILL.md`, plus optional `assets/` and `scripts/`.
+Каждый skill использует переносимую структуру Agent Skills: каталог с именем skill, файл `SKILL.md` и при необходимости каталоги `assets/` и `scripts/`.
 
-## Install
+## Установка
 
-Clone the repository and run one of:
+Склонируйте репозиторий и выполните одну из команд:
 
 ```sh
 ./install.sh codex
@@ -30,28 +27,24 @@ Clone the repository and run one of:
 ./install.sh all
 ```
 
-The installer creates symlinks and never overwrites an existing skill. Its
-targets are:
+Установщик создаёт символические ссылки и никогда не перезаписывает существующий skill. Он использует следующие глобальные каталоги:
 
-| Agent | Global skill directory |
+| Агент | Глобальный каталог skills |
 | --- | --- |
 | Codex | `~/.agents/skills` |
 | Claude Code | `~/.claude/skills` |
 | OpenCode | `~/.config/opencode/skills` |
 
-For a repository-local install, link the `skills/` subdirectories into the
-agent's project-local directory, for example `.agents/skills/`,
-`.claude/skills/`, or `.opencode/skills/`.
+Для установки на уровне репозитория создайте ссылки на подкаталоги `skills/` в каталоге агента: например, `.agents/skills/`, `.claude/skills/` или `.opencode/skills/`.
 
 ## Workflow
 
-Invoke `dev-task-workflow` for a complete task. It asks for a task identifier
-and an artifact directory outside the affected repositories, then delegates
-each stage to a focused skill.
+Используйте `dev-task-workflow`, когда пользователь просит сделать, выполнить, реализовать или проработать задачу, передаёт её номер либо ссылку, похожую на задачу Jira. Skill запрашивает идентификатор задачи и каталог для артефактов вне затронутых репозиториев, а затем передаёт этапы специализированным skills.
 
-The workflow does not perform commit, push, or pull-request creation without
-explicit user approval.
+По умолчанию все артефакты и сообщения создаются на русском языке. Другой язык используется только когда он явно задан в правилах проекта или репозитория.
 
-## License
+Workflow не выполняет commit, push или создание pull request без явного подтверждения пользователя.
+
+## Лицензия
 
 [MIT](LICENSE)
