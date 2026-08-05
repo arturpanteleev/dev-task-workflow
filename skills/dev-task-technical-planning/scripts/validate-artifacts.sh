@@ -88,6 +88,7 @@ if [[ -f "$proposal" ]]; then
   echo "== $proposal =="
   require_heading "$proposal" "Краткое описание задачи"
   require_heading "$proposal" "Бизнес-цель"
+  require_heading "$proposal" "Происхождение и обнаружение проблемы"
   require_heading "$proposal" "Контекст и пользователи"
   require_heading "$proposal" "Пользовательские сценарии"
   require_heading "$proposal" "Scope"

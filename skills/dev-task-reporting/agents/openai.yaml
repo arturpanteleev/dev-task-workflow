@@ -1,0 +1,4 @@
+interface:
+  display_name: "Итоговый отчёт задачи"
+  short_description: "HTML-отчёт о бизнес-контексте и реализации"
+  default_prompt: "Используй $dev-task-reporting для итогового адаптивного HTML-отчёта по завершённой задаче."
