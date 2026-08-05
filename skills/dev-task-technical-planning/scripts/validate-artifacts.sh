@@ -7,9 +7,9 @@ usage() {
   cat <<'EOF'
 Использование:
   validate-artifacts.sh --task-dir <каталог>
-  validate-artifacts.sh --proposal <путь> --spec <путь>
+  validate-artifacts.sh [--proposal <путь>] [--spec <путь>]
 
-Проверяет, что proposal.md и spec.md существуют и содержат обязательные заголовки.
+Проверяет, что один или оба указанных артефакта существуют и содержат обязательные заголовки.
 EOF
 }
 
@@ -52,7 +52,7 @@ if [[ -n "$task_dir" ]]; then
   spec="$task_dir/spec.md"
 fi
 
-[[ -n "$proposal" && -n "$spec" ]] || { usage >&2; exit 2; }
+[[ -n "$proposal" || -n "$spec" ]] || { usage >&2; exit 2; }
 
 errors=0
 
@@ -76,17 +76,27 @@ require_heading() {
   fi
 }
 
-require_file "$proposal" || true
-require_file "$spec" || true
+if [[ -n "$proposal" ]]; then
+  require_file "$proposal" || true
+fi
+
+if [[ -n "$spec" ]]; then
+  require_file "$spec" || true
+fi
 
 if [[ -f "$proposal" ]]; then
   echo "== $proposal =="
   require_heading "$proposal" "Краткое описание задачи"
   require_heading "$proposal" "Бизнес-цель"
+  require_heading "$proposal" "Контекст и пользователи"
+  require_heading "$proposal" "Пользовательские сценарии"
   require_heading "$proposal" "Scope"
   require_heading "$proposal" "Out of scope"
   require_heading "$proposal" "Зафиксированные продуктовые требования"
+  require_heading "$proposal" "Нефункциональные требования"
+  require_heading "$proposal" "Зависимости, rollout и откат"
   require_heading "$proposal" "Спорные моменты и принятые решения"
+  require_heading "$proposal" "Допущения и открытые вопросы"
   require_heading "$proposal" "Acceptance Criteria"
 fi
 
