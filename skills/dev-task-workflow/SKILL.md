@@ -44,6 +44,25 @@ description: "Оркестрация задач разработки из тре
 
 `approval_mode=auto` относится только к внутренним подтверждениям proposal и spec. Он не разрешает `commit`, `push` или создание PR: для Git-доставки всё равно требуется отдельное явное разрешение пользователя. Пользователь может сменить режим в любой момент.
 
+## Инкрементальный сбор данных
+
+Перед этапом 1 создай скелет `{artifact_dir}/{TASK-ID}/report-data.json` с `task.status = "in_progress"`, пустой `workflow_trace` и полями-плейсхолдерами (`"Не зафиксировано"`, пустые массивы). Схема описана в `references/report-data-schema.md` внутри `$dev-task-reporting`. Допиши в `workflow_trace` запись `{"stage": "init", "event": "started", "timestamp": "<ISO 8601>"}`.
+
+После каждого этапа:
+1. Допиши в `workflow_trace` итоговую запись: `stage`, `event` (`completed`/`blocked`/`error`/`skipped`), `timestamp`, `duration_ms`, `summary`. Для `approval-proposal` и `approval-spec` добавь `approval` (`auto_approved`/`user_approved`).
+2. Запиши `started`-событие для следующего этапа (кроме финального).
+3. Заполни поля `report-data.json`, данные для которых получены:
+   * после продуктового анализа: `summary.business_problem`, `business.*`, `solution.before`;
+   * после техпланирования: `solution.approach`, `solution.rationale`, `solution.after`, `risks`;
+   * после имплементации: `technical.repositories[].name|path|base_branch|target_branch|commit|components|changes`;
+   * после верификации: `validation.acceptance_criteria`, `validation.checks`, `validation.manual_checks`, `oversight.unverified`;
+   * после code review: `validation.review_findings`;
+   * после доставки: `technical.repositories[].pull_request`, `links`.
+
+При блокере или ошибке установи `task.status = "blocked"`, опиши проблему в `summary` записи trace, сохрани файл и остановись.
+
+На финальном этапе 9 установи `task.status = "pr_created"`, `task.generated_at`, заполни `oversight.*` и передай **уже заполненный** `report-data.json` навыку `$dev-task-reporting` для валидации и рендеринга HTML.
+
 ## Этапы и передача работы
 
 1. Вызови `$dev-task-product-analysis`. Передай `workflow_context`, исходное описание, доступный контекст и `discovery_mode=grill-me`. Навык создаст `{artifact_dir}/{TASK-ID}/proposal.md`.
@@ -54,7 +73,7 @@ description: "Оркестрация задач разработки из тре
 6. Вызови `$dev-task-verification`. Передай артефакты, итоговые diff, результаты проверок и известные ограничения. Навык проведёт единый verification pass и self-review.
 7. Вызови `$dev-task-code-review` для нетривиального изменения. Передай diff, артефакты и результаты проверок. Для тривиального изменения без новой логики и diff меньше 10 строк зафиксируй причину пропуска в будущем PR.
 8. Вызови `$dev-task-delivery`. Передай список файлов, результаты проверок, ограничения, имя ветки и предложенные commit message/PR text. До явного разрешения пользователя этот навык не выполняет commit, push или создание PR.
-9. Только после успешного создания PR во всех затронутых репозиториях вызови `$dev-task-reporting`. Передай весь `workflow_context`, исходную задачу, proposal, spec, проверенную сводку diff, результаты verification и review, ограничения и структурированные delivery metadata. Навык создаст `{artifact_dir}/{TASK-ID}/report-data.json` и `{artifact_dir}/{TASK-ID}/report.html`.
+9. Только после успешного создания PR во всех затронутых репозиториях вызови `$dev-task-reporting`. Передай артефакт-каталог, `workflow_context`, proposal, spec, проверенную сводку diff, результаты verification и review, ограничения, delivery metadata и **уже заполненный** `report-data.json`. Навык провалидирует данные через `scripts/validate_report.py` и создаст `{artifact_dir}/{TASK-ID}/report.html`.
 
 После каждого внутреннего этапа показывай краткое резюме. В `auto` продолжай без паузы после успешного quality gate; в `manual` требуй явного подтверждения после этапов 1 и 3. В обоих режимах отдельно запроси разрешение перед Git-действиями этапа 8. Этап 9 не требует отдельного подтверждения и не ждёт merge PR. Если PR не создан, не запускай reporting; если reporting завершился ошибкой после delivery, не откатывай Git-действия и считай workflow незавершённым до повторной генерации отчёта.
 

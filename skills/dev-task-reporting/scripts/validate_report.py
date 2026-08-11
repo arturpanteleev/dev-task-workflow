@@ -116,6 +116,66 @@ def find_forbidden_keys(value: Any, path: str, errors: list[str]) -> None:
             find_forbidden_keys(child, f"{path}[{index}]", errors)
 
 
+def validate_trace(trace: Any, is_final: bool, errors: list[str]) -> None:
+    valid_stages = {
+        "init",
+        "product-analysis",
+        "approval-proposal",
+        "technical-planning",
+        "approval-spec",
+        "implementation",
+        "verification",
+        "code-review",
+        "delivery",
+        "reporting",
+    }
+    valid_events = {"started", "completed", "blocked", "error", "retried", "skipped"}
+    required_stages = {
+        "product-analysis",
+        "technical-planning",
+        "implementation",
+        "verification",
+        "code-review",
+        "delivery",
+    }
+    completed_stages: set[str] = set()
+    blocked_stages: set[str] = set()
+
+    entries = require_list(trace, "$.workflow_trace", errors)
+    for index, entry in enumerate(entries):
+        p = f"$.workflow_trace[{index}]"
+        mapping = require_mapping(entry, p, errors)
+        require_enum(mapping, "stage", valid_stages, p, errors)
+        require_enum(mapping, "event", valid_events, p, errors)
+        require_string(mapping, "timestamp", p, errors)
+
+        event = mapping.get("event", "")
+        if event in {"completed", "blocked", "error", "skipped"}:
+            if mapping.get("duration_ms") is not None:
+                if not isinstance(mapping["duration_ms"], int) or mapping["duration_ms"] < 0:
+                    errors.append(f"{p}.duration_ms: ожидалось неотрицательное целое")
+            if event == "completed":
+                completed_stages.add(mapping.get("stage", ""))
+            if event in {"blocked", "error"}:
+                blocked_stages.add(mapping.get("stage", ""))
+                summary = mapping.get("summary")
+                if not isinstance(summary, str) or not summary.strip():
+                    errors.append(f"{p}.summary: описание блокера или ошибки обязательно")
+
+        stage = mapping.get("stage", "")
+        if stage in {"approval-proposal", "approval-spec"} and event == "completed":
+            require_enum(
+                mapping, "approval",
+                {"auto_approved", "user_approved"}, p, errors,
+            )
+
+    if is_final:
+        for stage in sorted(blocked_stages):
+            errors.append(f"$.workflow_trace: этап '{stage}' завершился блокером или ошибкой")
+        for stage in sorted(required_stages - completed_stages):
+            errors.append(f"$.workflow_trace: этап '{stage}' не имеет записи completed")
+
+
 def validate_data(data: Any) -> list[str]:
     errors: list[str] = []
     root = require_mapping(data, "$", errors)
@@ -137,6 +197,7 @@ def validate_data(data: Any) -> list[str]:
         "risks",
         "next_steps",
         "links",
+        "workflow_trace",
     }
     for key in sorted(required_root - root.keys()):
         errors.append(f"$.{key}: обязательное поле отсутствует")
@@ -144,11 +205,13 @@ def validate_data(data: Any) -> list[str]:
     task = require_mapping(root.get("task"), "$.task", errors)
     for field in ("id", "title", "generated_at"):
         require_string(task, field, "$.task", errors)
-    require_enum(task, "status", {"pr_created"}, "$.task", errors)
+    require_enum(task, "status", {"in_progress", "blocked", "pr_created"}, "$.task", errors)
     require_enum(task, "approval_mode", {"manual", "auto"}, "$.task", errors)
     source_url = require_string(task, "source_url", "$.task", errors)
     if source_url:
         validate_url(source_url, "$.task.source_url", errors, allow_missing=True)
+
+    is_final = task.get("status") == "pr_created"
 
     summary = require_mapping(root.get("summary"), "$.summary", errors)
     for field in ("business_problem", "solution", "outcome"):
@@ -210,7 +273,7 @@ def validate_data(data: Any) -> list[str]:
 
     technical = require_mapping(root.get("technical"), "$.technical", errors)
     repositories = require_list(technical.get("repositories"), "$.technical.repositories", errors)
-    if not repositories:
+    if is_final and not repositories:
         errors.append("$.technical.repositories: нужен хотя бы один репозиторий")
     for index, item in enumerate(repositories):
         path = f"$.technical.repositories[{index}]"
@@ -219,7 +282,12 @@ def validate_data(data: Any) -> list[str]:
             require_string(repository, field, path, errors)
         validate_string_list(repository.get("components"), f"{path}.components", errors)
         validate_string_list(repository.get("changes"), f"{path}.changes", errors)
-        pull_request = require_mapping(repository.get("pull_request"), f"{path}.pull_request", errors)
+        pull_request = repository.get("pull_request")
+        if pull_request is None:
+            if is_final:
+                errors.append(f"{path}.pull_request: обязательное поле отсутствует")
+            continue
+        pull_request = require_mapping(pull_request, f"{path}.pull_request", errors)
         number = require_integer(pull_request, "number", f"{path}.pull_request", errors)
         if number <= 0:
             errors.append(f"{path}.pull_request.number: номер PR должен быть положительным")
@@ -306,6 +374,8 @@ def validate_data(data: Any) -> list[str]:
         url = item.get("url", "")
         if isinstance(url, str) and url:
             validate_url(url, f"$.links[{index}].url", errors)
+
+    validate_trace(root.get("workflow_trace"), is_final, errors)
 
     find_forbidden_keys(root, "$", errors)
     return errors
