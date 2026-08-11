@@ -21,6 +21,8 @@ DEFAULT_TEMPLATE = SCRIPT_DIR.parent / "assets" / "report-template.html"
 
 STATUS_LABELS = {
     "pr_created": "PR создан",
+    "in_progress": "В процессе",
+    "blocked": "Заблокирован",
     "manual": "Ручной режим",
     "auto": "Авторежим",
     "draft": "Draft",
@@ -47,6 +49,8 @@ STATUS_LABELS = {
 
 STATUS_CLASSES = {
     "pr_created": "success",
+    "in_progress": "accent",
+    "blocked": "danger",
     "manual": "neutral",
     "auto": "accent",
     "draft": "neutral",
@@ -69,7 +73,46 @@ STATUS_CLASSES = {
     "low": "success",
     "medium": "warning",
     "high": "danger",
+    "started": "neutral",
+    "completed": "success",
+    "error": "danger",
+    "retried": "warning",
 }
+
+STAGE_LABELS: dict[str, str] = {
+    "init": "Инициализация",
+    "product-analysis": "Продуктовый анализ",
+    "approval-proposal": "Утверждение proposal",
+    "technical-planning": "Техническое планирование",
+    "approval-spec": "Утверждение spec",
+    "implementation": "Реализация",
+    "verification": "Верификация",
+    "code-review": "Code Review",
+    "delivery": "Доставка",
+    "reporting": "Итоговый отчёт",
+}
+
+EVENT_LABELS: dict[str, str] = {
+    "started": "Начат",
+    "completed": "Завершён",
+    "blocked": "Заблокирован",
+    "error": "Ошибка",
+    "retried": "Повторно",
+    "skipped": "Пропущен",
+}
+
+STAGE_ORDER = [
+    "init",
+    "product-analysis",
+    "approval-proposal",
+    "technical-planning",
+    "approval-spec",
+    "implementation",
+    "verification",
+    "code-review",
+    "delivery",
+    "reporting",
+]
 
 
 def escape(value: Any) -> str:
@@ -110,6 +153,7 @@ def render_hero(data: dict[str, Any]) -> str:
     pr_buttons = "".join(
         link_button(repo["pull_request"]["url"], f'{repo["name"]} · PR #{repo["pull_request"]["number"]}')
         for repo in repositories
+        if repo.get("pull_request") and repo["pull_request"].get("url")
     )
     return f"""
     <header class="hero" id="top">
@@ -263,6 +307,85 @@ def render_solution(data: dict[str, Any]) -> str:
     """
 
 
+def format_duration(ms: int | None) -> str:
+    if ms is None:
+        return ""
+    if ms < 1000:
+        return f"{ms} мс"
+    if ms < 60000:
+        return f"{ms / 1000:.1f} с"
+    if ms < 3600000:
+        m = int(ms / 60000)
+        s = int((ms % 60000) / 1000)
+        return f"{m} мин {s} с" if s else f"{m} мин"
+    return "—"
+
+
+def render_trace(data: dict[str, Any]) -> str:
+    trace = data.get("workflow_trace", [])
+    if not trace:
+        return ""
+
+    stages: dict[str, dict[str, Any]] = {}
+    for entry in trace:
+        stage = entry.get("stage", "")
+        if stage not in stages:
+            stages[stage] = {"started": None, "result": None}
+        if entry.get("event") == "started":
+            stages[stage]["started"] = entry
+        elif entry.get("event") in {"completed", "blocked", "error", "skipped"}:
+            stages[stage]["result"] = entry
+
+    items: list[str] = []
+    for stage_id in STAGE_ORDER:
+        if stage_id not in stages:
+            continue
+        info = stages[stage_id]
+        result = info.get("result")
+        if result is None:
+            continue
+
+        event = result.get("event", "")
+        event_class = STATUS_CLASSES.get(event, "neutral")
+        stage_label = STAGE_LABELS.get(stage_id, stage_id)
+        event_label = EVENT_LABELS.get(event, event)
+        timestamp = result.get("timestamp", "")
+        duration = format_duration(result.get("duration_ms"))
+        summary = result.get("summary", "")
+        approval = result.get("approval", "")
+
+        approval_badge = badge(approval) if approval else ""
+        summary_html = f'<p class="timeline-item__summary">{prose(summary)}</p>' if summary else ""
+
+        items.append(f"""
+        <div class="timeline-item timeline-item--{event_class}">
+          <div class="timeline-item__marker"><span></span></div>
+          <div class="timeline-item__content">
+            <div class="timeline-item__header">
+              <h3>{escape(stage_label)}</h3>
+              <div class="timeline-item__meta">
+                {badge(event_label)}
+                {approval_badge}
+                <span class="timeline-item__duration">{escape(duration)}</span>
+                <time datetime="{escape(timestamp)}">{escape(timestamp)}</time>
+              </div>
+            </div>
+            {summary_html}
+          </div>
+        </div>
+        """)
+
+    if not items:
+        return ""
+
+    return f"""
+    <section id="trace" class="section trace-section">
+      <h2 class="trace-heading">Ход выполнения</h2>
+      <div class="timeline">{"".join(items)}</div>
+    </section>
+    """
+
+
 def render_decisions(data: dict[str, Any]) -> str:
     oversight = data["oversight"]
     approval_gates = "".join(
@@ -293,15 +416,21 @@ def render_decisions(data: dict[str, Any]) -> str:
 def render_technical(data: dict[str, Any]) -> str:
     cards = []
     for repository in data["technical"]["repositories"]:
-        pull_request = repository["pull_request"]
+        pull_request = repository.get("pull_request")
+        pr_status = badge(pull_request["status"]) if pull_request else ""
+        pr_url = ""
+        if pull_request and pull_request.get("url") and pull_request.get("number"):
+            pr_url = f'<a href="{safe_url(pull_request["url"])}">#{pull_request["number"]} <span aria-hidden="true">↗</span></a>'
+        elif not pull_request:
+            pr_url = '<span class="empty-state">Не создан</span>'
         components = "".join(f'<span class="tag">{escape(item)}</span>' for item in repository["components"])
         cards.append(f"""
         <article class="repo-card">
-          <div class="repo-card__header"><div><span class="kicker">Репозиторий</span><h3>{escape(repository['name'])}</h3></div>{badge(pull_request['status'])}</div>
+          <div class="repo-card__header"><div><span class="kicker">Репозиторий</span><h3>{escape(repository['name'])}</h3></div>{pr_status}</div>
           <dl class="metadata">
             <div><dt>Ветки</dt><dd>{escape(repository['base_branch'])} → {escape(repository['target_branch'])}</dd></div>
             <div><dt>Commit</dt><dd><code>{escape(repository['commit'])}</code></dd></div>
-            <div><dt>PR</dt><dd><a href="{safe_url(pull_request['url'])}">#{pull_request['number']} <span aria-hidden="true">↗</span></a></dd></div>
+            <div><dt>PR</dt><dd>{pr_url}</dd></div>
             <div><dt>Путь</dt><dd><code>{escape(repository['path'])}</code></dd></div>
           </dl>
           <div class="tags">{components or '<span class="tag">Компоненты не зафиксированы</span>'}</div>
@@ -395,6 +524,7 @@ def build_body(data: dict[str, Any]) -> str:
             '<a class="skip-link" href="#executive-summary">Перейти к содержанию</a>',
             '<div class="page-shell">',
             render_hero(data),
+            render_trace(data),
             render_navigation(),
             '<main>',
             render_summary(data),
