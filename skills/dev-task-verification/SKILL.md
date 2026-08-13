@@ -30,4 +30,4 @@ description: "Проведи единый verification pass для реализ�
 
 Исправь найденные проблемы и повторно запусти затронутые проверки.
 
-В конце верни DoD-отчёт: выполненные Acceptance Criteria, тесты, ручные проверки или причину пропуска, непроверенные сценарии, известные ограничения и готовность к внешнему review. Не выполняй внешний review, commit, push или создание PR.
+В конце запиши результат этапа в `{artifact_dir}/{TASK-ID}/stage-results/verification.json` по схеме `$dev-task-workflow/references/stage-result-schema.md`: `stage: "verification"`, `status`, `summary`, `artifacts` (изменённые файлы), `warnings`, при ошибке — `error` (код `test_failed`), `suggested_next` — `"code-review"` при успехе, `"back_to_implementation"` при `test_failed`. Затем верни DoD-отчёт: выполненные Acceptance Criteria, тесты, ручные проверки или причину пропуска, непроверенные сценарии, известные ограничения и готовность к внешнему review. Не выполняй внешний review, commit, push или создание PR.

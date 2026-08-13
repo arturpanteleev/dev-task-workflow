@@ -25,4 +25,4 @@ description: Исследуй код и подготовь проверяемы�
 bash scripts/validate-artifacts.sh --task-dir {artifact_dir}/{TASK-ID}
 ```
 
-Исправь отсутствующие обязательные разделы до завершения этапа. В конце покажи краткое резюме выбранного решения, риски и путь к `spec.md`. Не начинай реализацию самостоятельно.
+Исправь отсутствующие обязательные разделы до завершения этапа. В конце запиши результат этапа в `{artifact_dir}/{TASK-ID}/stage-results/technical-planning.json` по схеме `$dev-task-workflow/references/stage-result-schema.md`: `stage: "technical-planning"`, `status`, `summary`, `artifacts: ["{artifact_dir}/{TASK-ID}/spec.md"]`, `warnings`, при ошибке — `error` (коды: `requirements_error`, `missing_input`), `suggested_next` — `"approval-spec"` при успехе, `"back_to_product_analysis"` при `requirements_error`, `"await_user"` при `missing_input`. Затем покажи краткое резюме выбранного решения, риски и путь к `spec.md`. Не начинай реализацию самостоятельно.

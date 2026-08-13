@@ -66,7 +66,7 @@ description: "Оркестрация задач разработки из тре
 * Файл отсутствует или `resumable = false` — начинай workflow с нуля.
 * `resumable = true` — возобнови задачу:
   1. Восстанови `workflow_context` из файла состояния; не собирай параметры повторно.
-  2. Убедись, что артефакты из `completed_stages` на месте (`proposal.md`, `spec.md`, при необходимости `report-data.json`). Если артефакта нет — вернись на соответствующий этап.
+  2. Убедись, что артефакты из `completed_stages` на месте (`proposal.md`, `spec.md`, при необходимости `report-data.json`). Если артефакта нет — вернись на соответствующий этап. Файл результата прерванного этапа `stage-results/{current_stage}.json` удали — перед повторным вызовом этапа он будет создан заново.
   3. Сообщи пользователю, на каком этапе остановились и почему (`last_error`).
   4. В `auto` продолжай с `current_stage` без подтверждения. В `manual` запроси явное согласие продолжить или начать заново.
   5. Продолжай использовать существующие `report-data.json` и `.workflow-state.json`, не создавай их заново. При выборе «начать заново» сбрось оба файла и предыдущие артефакты задачи.
@@ -85,13 +85,33 @@ description: "Оркестрация задач разработки из тре
 
 `approval_mode=auto` относится только к внутренним подтверждениям proposal и spec. Он не разрешает `commit`, `push` или создание PR: для Git-доставки всё равно требуется отдельное явное разрешение пользователя. Пользователь может сменить режим в любой момент.
 
+## Контракт результата этапа
+
+Каждый суб-навык завершает работу записью машиночитаемого результата `{artifact_dir}/{TASK-ID}/stage-results/{stage}.json`. Схема, допустимые коды ошибок и `suggested_next` — в `references/stage-result-schema.md`.
+
+Перед вызовом суб-навыка удали `{artifact_dir}/{TASK-ID}/stage-results/{stage}.json` (даже если файла нет) — чтобы не принять результат прошлого запуска за свежий.
+
+После возврата суб-навыка:
+
+1. Прочитай файл результата и провалидируй по схеме. Файл отсутствует, содержит невалидный JSON, `stage` не совпадает с именем файла или `error` не заполнен при `status = error`/`blocked` — считай `status = error`, `error.code = unknown`.
+2. Сведи `status` к событию `workflow_trace` (`ok → completed`, `blocked → blocked`, `error → error`, `skipped → skipped`) и занеси `summary`, `duration_ms` в запись trace.
+3. Зеркалируй в `.workflow-state.json` (правила — в разделе «Состояние workflow и возобновление»).
+4. Действуй по `suggested_next`:
+   * `status = ok` или `skipped` — переходи к этапу из `suggested_next`;
+   * `error.code = requirements_error` — вернись на продуктовый анализ (🚨);
+   * `error.code = test_failed` или `review_required` — вернись на реализацию;
+   * `error.code = preflight_blocked`, `missing_input` или `user_cancelled` — остановись, покажи проблему и жди решения пользователя;
+   * `error.code = unknown` — повтори этап один раз; если ошибка повторилась, остановись.
+
+Резюме для пользователя после этапа бери из `summary` файла результата, не пересказывай вывод навыка заново.
+
 ## Инкрементальный сбор данных
 
 Перед этапом 1 создай скелет `{artifact_dir}/{TASK-ID}/report-data.json` с `task.status = "in_progress"`, пустой `workflow_trace` и полями-плейсхолдерами (`"Не зафиксировано"`, пустые массивы). Схема описана в `references/report-data-schema.md` внутри `$dev-task-reporting`. Допиши в `workflow_trace` запись `{"stage": "init", "event": "started", "timestamp": "<ISO 8601>"}`.
 
 После каждого этапа обновляй `report-data.json` и `.workflow-state.json` (правила состояния — в разделе «Состояние workflow и возобновление»):
 
-1. Допиши в `workflow_trace` итоговую запись: `stage`, `event` (`completed`/`blocked`/`error`/`skipped`), `timestamp`, `duration_ms`, `summary`. Для `approval-proposal` и `approval-spec` добавь `approval` (`auto_approved`/`user_approved`).
+1. Допиши в `workflow_trace` итоговую запись: `stage`, `event` (`completed`/`blocked`/`error`/`skipped`), `timestamp`, `duration_ms`, `summary` — значения из файла результата этапа (см. «Контракт результата этапа»). Для `approval-proposal` и `approval-spec` добавь `approval` (`auto_approved`/`user_approved`).
 2. Запиши `started`-событие для следующего этапа (кроме финального).
 3. Заполни поля `report-data.json`, данные для которых получены:
    * после продуктового анализа: `summary.business_problem`, `business.*`, `solution.before`;

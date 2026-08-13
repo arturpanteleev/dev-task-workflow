@@ -43,3 +43,7 @@
 * При блокере или ошибке установи `status: "blocked"`, `current_stage` — этап, на котором остановились, `last_error` — краткое описание проблемы, `resumable: true`.
 * После успешного `reporting` установи `status: "completed"`, `current_stage: null`, `resumable: false`.
 * `completed_stages` никогда не удаляй и не переупорядочивай: это история выполнения.
+
+### Источник данных: результат этапа
+
+Статус и ошибку бери из файла результата этапа `stage-results/{stage}.json` (схема — в `references/stage-result-schema.md`), а не из пересказа навыка. `status = ok`/`skipped` → успех и следующий этап; `status = error`/`blocked` → `status: "blocked"`, `last_error` из `error.message`. Файлы `stage-results` — рабочие артефакты этапа, в состояние не записываются и удаляются перед повторным запуском этапа.
