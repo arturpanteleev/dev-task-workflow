@@ -43,4 +43,4 @@ description: Проанализируй задачу разработки в у�
 
 Acceptance Criteria должны описывать наблюдаемое поведение, не диктовать реализацию и включать успешные сценарии, ошибки и невалидные данные, значимые edge cases и инварианты. Для каждого существенного требования должен существовать хотя бы один Acceptance Criterion либо явное обоснование, почему он не нужен.
 
-В конце покажи краткое резюме требований, список открытых вопросов и путь к артефакту. Не переходи к техническому планированию самостоятельно.
+В конце запиши результат этапа в `{artifact_dir}/{TASK-ID}/stage-results/product-analysis.json` по схеме `$dev-task-workflow/references/stage-result-schema.md`: `stage: "product-analysis"`, `status`, `summary`, `artifacts: ["{artifact_dir}/{TASK-ID}/proposal.md"]`, `warnings`, при ошибке — `error` (коды: `missing_input`, `user_cancelled`), `suggested_next: "approval-proposal"`. Затем покажи краткое резюме требований, список открытых вопросов и путь к артефакту. Не переходи к техническому планированию самостоятельно.

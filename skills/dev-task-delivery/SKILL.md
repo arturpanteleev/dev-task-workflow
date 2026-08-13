@@ -21,4 +21,4 @@ description: Подготовь и доставь утверждённые из�
 
 Не выполняй commit, push и создание PR, пока пользователь явно не разрешит это после просмотра подготовленного пакета.
 
-После разрешения в каждом затронутом репозитории выполни `commit → push → создание PR`. Верни структурированные delivery metadata для следующего этапа: репозиторий, base- и target-ветки, commit SHA, номер, URL и статус PR. В конце сообщи имя ветки и ссылку на каждый PR.
+После разрешения в каждом затронутом репозитории выполни `commit → push → создание PR`. Верни структурированные delivery metadata для следующего этапа: репозиторий, base- и target-ветки, commit SHA, номер, URL и статус PR. В конце запиши результат этапа в `{artifact_dir}/{TASK-ID}/stage-results/delivery.json` по схеме `$dev-task-workflow/references/stage-result-schema.md`: `stage: "delivery"`, `status`, `summary`, `artifacts`, `warnings`, при ошибке — `error` (коды: `preflight_blocked`, `missing_input`, `user_cancelled`), `suggested_next` — `"reporting"` при успехе, `"await_user"` при блокере. Затем сообщи имя ветки и ссылку на каждый PR.
