@@ -82,9 +82,9 @@
 
 ## Допустимые `suggested_next`
 
-`approval-proposal`, `approval-spec`, `verification`, `code-review`, `delivery`, `reporting`, `back_to_product_analysis`, `back_to_implementation`, `await_user`, `stop`, `null`.
+`approval-proposal`, `approval-spec`, `verification`, `code-review`, `delivery`, `reporting`, `retrospective`, `back_to_product_analysis`, `back_to_implementation`, `await_user`, `stop`, `null`.
 
-Для `status = ok` `suggested_next` указывает следующий этап по плану (после `reporting` — `null`). Для `status = blocked` или `error` — действие из таблицы выше. Для `status = skipped` — следующий этап по плану (например, `code-review` → `delivery`).
+Для `status = ok` или `skipped` `suggested_next` указывает следующий этап по плану (после `retrospective` — `null`). Для `status = blocked` или `error` — действие из таблицы выше. Для `status = skipped` — следующий этап по плану (например, `code-review` → `delivery`).
 
 ## Соответствие `status` и событий `workflow_trace`
 

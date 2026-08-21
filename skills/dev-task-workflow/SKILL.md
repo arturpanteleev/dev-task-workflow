@@ -123,7 +123,7 @@ description: "Оркестрация задач разработки из тре
 
 После каждого этапа обновляй `report-data.json` и `.workflow-state.json` (правила состояния — в разделе «Состояние workflow и возобновление»):
 
-1. Допиши в `workflow_trace` итоговую запись: `stage`, `event` (`completed`/`blocked`/`error`/`skipped`), `timestamp`, `duration_ms`, `summary` — значения из файла результата этапа (см. «Контракт результата этапа»). Для `approval-proposal` и `approval-spec` добавь `approval` (`auto_approved`/`user_approved`).
+1. Допиши в `workflow_trace` итоговую запись: `stage`, `event` (`completed`/`blocked`/`error`/`skipped`), `timestamp`, `duration_ms`, `summary`. `summary` бери из файла результата этапа (см. «Контракт результата этапа»), `duration_ms` рассчитай по паре `started`/итоговой записи. Для `approval-proposal` и `approval-spec` добавь `approval` (`auto_approved`/`user_approved`).
 2. Запиши `started`-событие для следующего этапа (кроме финального). Если для этапа уже есть незакрытая `started`-запись (например, после возобновления), переиспользуй её вместо создания новой.
 3. Заполни поля `report-data.json`, данные для которых получены:
    * после продуктового анализа: `summary.business_problem`, `business.*`, `solution.before`;
