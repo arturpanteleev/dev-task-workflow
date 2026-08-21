@@ -35,14 +35,14 @@
 
 ## Допустимые этапы
 
-`init`, `product-analysis`, `approval-proposal`, `technical-planning`, `approval-spec`, `implementation`, `verification`, `code-review`, `delivery`, `reporting`.
+`init`, `product-analysis`, `approval-proposal`, `technical-planning`, `approval-spec`, `implementation`, `verification`, `code-review`, `delivery`, `reporting`, `retrospective`.
 
 ## Правила обновления
 
 * Перед этапом 1 создай файл с `status: "in_progress"`, `current_stage: "product-analysis"`, `completed_stages: ["init"]`, `last_error: null`, `resumable: true`.
 * После успешного завершения этапа добавь его в `completed_stages` и установи `current_stage` на следующий этап.
 * При блокере или ошибке установи `status: "blocked"`, `current_stage` — этап, на котором остановились, `last_error` — краткое описание проблемы, `resumable: true`.
-* После успешного `reporting` установи `status: "completed"`, `current_stage: null`, `resumable: false`.
+* После успешного `retrospective` установи `status: "completed"`, `current_stage: null`, `resumable: false`.
 * `completed_stages` никогда не удаляй и не переупорядочивай: это история выполнения.
 * При каждом возврате на этап (`back_to_*`) увеличь счётчик этого этапа в `return_counts`; больше трёх возвратов на один этап не допускается — останови workflow.
 

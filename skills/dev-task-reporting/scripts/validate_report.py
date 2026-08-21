@@ -128,6 +128,7 @@ def validate_trace(trace: Any, is_final: bool, errors: list[str]) -> None:
         "code-review",
         "delivery",
         "reporting",
+        "retrospective",
     }
     valid_events = {"started", "completed", "blocked", "error", "retried", "skipped"}
     required_stages = {

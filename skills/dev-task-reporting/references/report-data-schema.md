@@ -71,7 +71,7 @@
 }
 ```
 
-* `stage` — идентификатор этапа: `init`, `product-analysis`, `approval-proposal`, `technical-planning`, `approval-spec`, `implementation`, `verification`, `code-review`, `delivery`, `reporting`;
+* `stage` — идентификатор этапа: `init`, `product-analysis`, `approval-proposal`, `technical-planning`, `approval-spec`, `implementation`, `verification`, `code-review`, `delivery`, `reporting`, `retrospective`;
 * `event` — тип события: `started`, `completed`, `blocked`, `error`, `retried`, `skipped`;
 * `timestamp` — момент события в ISO 8601;
 * `duration_ms` — длительность этапа в миллисекундах (только для `completed`, `blocked`, `error` или `skipped`);

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dev Task Workflow"
+  short_description: "Strict workflow for end-to-end dev tasks"
+  default_prompt: "Use $dev-task-workflow to execute a development task from analysis through delivery."

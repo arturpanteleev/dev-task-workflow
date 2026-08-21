@@ -63,7 +63,7 @@ description: "Оркестрация задач разработки из тре
 * при смене пользователем режима подтверждений обнови `approval_mode`;
 * `resumable` оставляй `true`, пока workflow не завершён.
 
-После успешного `reporting`: `status = "completed"`, `current_stage = null`, `resumable = false`.
+После успешного `retrospective`: `status = "completed"`, `current_stage = null`, `resumable = false`.
 
 ### Возобновление после обрыва
 
@@ -133,7 +133,7 @@ description: "Оркестрация задач разработки из тре
    * после code review: `validation.review_findings`;
    * после доставки: `technical.repositories[].pull_request`, `links`.
 
-При блокере или ошибке установи `task.status = "blocked"`, опиши проблему в `summary` записи trace, сохрани файл и остановись.
+При блокере или ошибке установи `task.status = "blocked"`, опиши проблему в `summary` записи trace, сохрани файл. Перед остановкой на блокере или ошибке заполни сокращённую ретроспективу в `{artifact_dir}/{TASK-ID}/retrospective.md`: только раздел «Наблюдаемые проблемы» и вердикт; при последующем возобновлении дополни её до полной на этапе 10.
 
 На финальном этапе 9 установи `task.status = "pr_created"`, `task.generated_at`, заполни `oversight.*` и передай **уже заполненный** `report-data.json` навыку `$dev-task-reporting` для валидации и рендеринга HTML.
 
@@ -149,7 +149,8 @@ description: "Оркестрация задач разработки из тре
 | 6 | verification | `$dev-task-verification` | DoD-отчёт, self-review | code-review |
 | 7 | code-review | `$dev-task-code-review` | замечания, исправления | delivery |
 | 8 | delivery | `$dev-task-delivery` | commit, PR | reporting |
-| 9 | reporting | `$dev-task-reporting` | `report.html` | конец |
+| 9 | reporting | `$dev-task-reporting` | `report.html` | retrospective |
+| 10 | retrospective | оркестратор | `retrospective.md` | конец |
 
 1. Вызови `$dev-task-product-analysis`. Передай `workflow_context`, исходное описание, доступный контекст и `discovery_mode=grill-me`. Навык создаст `{artifact_dir}/{TASK-ID}/proposal.md`.
 2. Примени к `proposal.md` подтверждение согласно `approval_mode`.
@@ -160,8 +161,9 @@ description: "Оркестрация задач разработки из тре
 7. Вызови `$dev-task-code-review` для любого изменения независимо от размера diff. Передай diff, артефакты и результаты проверок.
 8. Вызови `$dev-task-delivery`. Передай список файлов, результаты проверок, ограничения, имя ветки и предложенные commit message/PR text. До явного разрешения пользователя этот навык не выполняет commit, push или создание PR. При нескольких репозиториях выполняй их последовательно; если в одном репозитории commit, push или создание PR потерпели неудачу после успешных действий в другом, не откатывай уже выполненные Git-действия — зафиксируй частичный результат (что сделано, что нет) и остановись с `await_user`.
 9. Только после успешного создания PR во всех затронутых репозиториях вызови `$dev-task-reporting`. Передай артефакт-каталог, `workflow_context`, proposal, spec, проверенную сводку diff, результаты verification и review, ограничения, delivery metadata и **уже заполненный** `report-data.json`. Навык провалидирует данные через `scripts/validate_report.py` и создаст `{artifact_dir}/{TASK-ID}/report.html`.
+10. Проведи ретроспективу и создай `{artifact_dir}/{TASK-ID}/retrospective.md` на основе `$dev-task-workflow/assets/retrospective-template.md`. Основывайся только на наблюдаемых фактах этой задачи: записях `workflow_trace`, `last_error`, warnings, собственных тупиках и повторных перечитываниях инструкций. Каждое предложение об улучшении указывай конкретный файл и раздел, который стоит изменить; абстрактные пожелания не записывай и не дублируй ограничения, уже явно описанные в навыках. Если проблем не найдено, запиши в вердикт одну строку: «Новых точек для улучшения не найдено». Файл `stage-results/retrospective.json` для этого этапа не создавай — итоговую запись в `workflow_trace` допиши сам.
 
-После каждого внутреннего этапа показывай краткое резюме. В `auto` продолжай без паузы после успешного quality gate; в `manual` требуй явного подтверждения после этапов 1 и 3. В обоих режимах отдельно запроси разрешение перед Git-действиями этапа 8. Этап 9 не требует отдельного подтверждения и не ждёт merge PR. Если PR не создан, не запускай reporting; если reporting завершился ошибкой после delivery, не откатывай Git-действия и считай workflow незавершённым до повторной генерации отчёта.
+После каждого внутреннего этапа показывай краткое резюме. В `auto` продолжай без паузы после успешного quality gate; в `manual` требуй явного подтверждения после этапов 1 и 3. В обоих режимах отдельно запроси разрешение перед Git-действиями этапа 8. Этапы 9 и 10 не требуют отдельного подтверждения; этап 10 не ждёт merge PR. Если PR не создан, не запускай reporting; если reporting завершился ошибкой после delivery, не откатывай Git-действия и считай workflow незавершённым до повторной генерации отчёта.
 
 ## Прямой вызов специализированных навыков
 
