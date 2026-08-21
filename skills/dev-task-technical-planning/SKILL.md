@@ -19,7 +19,7 @@ description: Исследуй код и подготовь проверяемы�
 
 Создай `{artifact_dir}/{TASK-ID}/spec.md` на основе `assets/spec-template.md`. Заполни каждый раздел конкретными изменениями по файлам или модулям.
 
-После создания обоих артефактов запусти:
+После создания `spec.md` запусти:
 
 ```bash
 bash scripts/validate-artifacts.sh --task-dir {artifact_dir}/{TASK-ID}

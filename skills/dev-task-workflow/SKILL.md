@@ -64,6 +64,8 @@ description: "Оркестрация задач разработки из тре
 При старте workflow проверь `{artifact_dir}/{TASK-ID}/.workflow-state.json`:
 
 * Файл отсутствует или `resumable = false` — начинай workflow с нуля.
+* Файл есть, но содержит невалидный JSON — предупреди пользователя и предложи выбор: начать заново (существующий каталог артефактов `{TASK-ID}` переименуй в `{TASK-ID}.backup-<timestamp>`, чтобы не потерять proposal и spec) или прерваться.
+* Запрошенный `TASK-ID` отличается от `task_id` в файле состояния регистром или написанием — уточни у пользователя, какой идентификатор верен, и продолжай только после подтверждения.
 * `resumable = true` — возобнови задачу:
   1. Восстанови `workflow_context` из файла состояния; не собирай параметры повторно.
   2. Убедись, что артефакты из `completed_stages` на месте (`proposal.md`, `spec.md`, при необходимости `report-data.json`). Если артефакта нет — вернись на соответствующий этап. Файл результата прерванного этапа `stage-results/{current_stage}.json` удали — перед повторным вызовом этапа он будет создан заново.
@@ -94,14 +96,18 @@ description: "Оркестрация задач разработки из тре
 После возврата суб-навыка:
 
 1. Прочитай файл результата и провалидируй по схеме. Файл отсутствует, содержит невалидный JSON, `stage` не совпадает с именем файла или `error` не заполнен при `status = error`/`blocked` — считай `status = error`, `error.code = unknown`.
-2. Сведи `status` к событию `workflow_trace` (`ok → completed`, `blocked → blocked`, `error → error`, `skipped → skipped`) и занеси `summary`, `duration_ms` в запись trace.
+2. Сведи `status` к событию `workflow_trace` (`ok → completed`, `blocked → blocked`, `error → error`, `skipped → skipped`), занеси `summary` и рассчитай `duration_ms` сам — как разницу timestamp пары `started`/итоговой записи. Значение `duration_ms` из файла результата не требуется и игнорируется.
 3. Зеркалируй в `.workflow-state.json` (правила — в разделе «Состояние workflow и возобновление»).
 4. Действуй по `suggested_next`:
    * `status = ok` или `skipped` — переходи к этапу из `suggested_next`;
    * `error.code = requirements_error` — вернись на продуктовый анализ (🚨);
    * `error.code = test_failed` или `review_required` — вернись на реализацию;
    * `error.code = preflight_blocked`, `missing_input` или `user_cancelled` — остановись, покажи проблему и жди решения пользователя;
-   * `error.code = unknown` — повтори этап один раз; если ошибка повторилась, остановись.
+   * `error.code = unknown` — допиши в `workflow_trace` запись `{"stage": "<этап>", "event": "retried", "timestamp": "<ISO 8601>"}` и повтори этап один раз; если ошибка повторилась, остановись.
+
+### Защита от циклов
+
+Веди счётчик возвратов на каждый этап в поле `return_counts` файла состояния (объект `{stage: число}`). При каждом возврате на этап (`back_to_*`) увеличь счётчик этого этапа. Возврат на один этап разрешён не более трёх раз; при необходимости четвёртого возврата остановись, покажи накопившуюся проблему и жди решения пользователя (`await_user`).
 
 Резюме для пользователя после этапа бери из `summary` файла результата, не пересказывай вывод навыка заново.
 
@@ -112,7 +118,7 @@ description: "Оркестрация задач разработки из тре
 После каждого этапа обновляй `report-data.json` и `.workflow-state.json` (правила состояния — в разделе «Состояние workflow и возобновление»):
 
 1. Допиши в `workflow_trace` итоговую запись: `stage`, `event` (`completed`/`blocked`/`error`/`skipped`), `timestamp`, `duration_ms`, `summary` — значения из файла результата этапа (см. «Контракт результата этапа»). Для `approval-proposal` и `approval-spec` добавь `approval` (`auto_approved`/`user_approved`).
-2. Запиши `started`-событие для следующего этапа (кроме финального).
+2. Запиши `started`-событие для следующего этапа (кроме финального). Если для этапа уже есть незакрытая `started`-запись (например, после возобновления), переиспользуй её вместо создания новой.
 3. Заполни поля `report-data.json`, данные для которых получены:
    * после продуктового анализа: `summary.business_problem`, `business.*`, `solution.before`;
    * после техпланирования: `solution.approach`, `solution.rationale`, `solution.after`, `risks`;
@@ -133,7 +139,7 @@ description: "Оркестрация задач разработки из тре
 4. Примени к `spec.md` подтверждение согласно `approval_mode`.
 5. Вызови `$dev-task-implementation`. Передай утверждённые `proposal.md`, `spec.md`, список репозиториев, `base_branch` и `target_branch`. Навык выполнит read-only preflight, реализует изменения и запустит применимые автоматические проверки.
 6. Вызови `$dev-task-verification`. Передай артефакты, итоговые diff, результаты проверок и известные ограничения. Навык проведёт единый verification pass и self-review.
-7. Вызови `$dev-task-code-review` для нетривиального изменения. Передай diff, артефакты и результаты проверок. Для тривиального изменения без новой логики и diff меньше 10 строк зафиксируй причину пропуска в будущем PR.
+7. Вызови `$dev-task-code-review` для любого изменения независимо от размера diff. Передай diff, артефакты и результаты проверок.
 8. Вызови `$dev-task-delivery`. Передай список файлов, результаты проверок, ограничения, имя ветки и предложенные commit message/PR text. До явного разрешения пользователя этот навык не выполняет commit, push или создание PR.
 9. Только после успешного создания PR во всех затронутых репозиториях вызови `$dev-task-reporting`. Передай артефакт-каталог, `workflow_context`, proposal, spec, проверенную сводку diff, результаты verification и review, ограничения, delivery metadata и **уже заполненный** `report-data.json`. Навык провалидирует данные через `scripts/validate_report.py` и создаст `{artifact_dir}/{TASK-ID}/report.html`.
 
