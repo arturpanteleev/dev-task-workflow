@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# Проверяй обязательные заголовки в артефактах workflow. Скрипт выполняет только чтение.
+# Проверяй обязательные разделы в артефактах workflow. Скрипт выполняет только чтение.
+#
+# Для каждого артефакта проверяется:
+# 1. наличие всех обязательных заголовков (допустим русский или английский вариант);
+# 2. отсутствие незаполненных HTML-комментариев шаблона;
+# 3. непустое содержимое под каждым обязательным заголовком.
 
 set -u
 
@@ -9,7 +14,9 @@ usage() {
   validate-artifacts.sh --task-dir <каталог>
   validate-artifacts.sh [--proposal <путь>] [--spec <путь>]
 
-Проверяет, что один или оба указанных артефакта существуют и содержат обязательные заголовки.
+Проверяет, что указанные артефакты существуют, содержат обязательные заголовки
+(на русском или английском языке), не содержат HTML-комментариев шаблона
+и имеют непустое содержимое в каждом обязательном разделе.
 EOF
 }
 
@@ -56,6 +63,34 @@ fi
 
 errors=0
 
+# Формат элемента: "русский заголовок|english heading"
+PROPOSAL_SECTIONS=(
+  "Краткое описание задачи|Task summary"
+  "Бизнес-цель|Business goal"
+  "Происхождение и обнаружение проблемы|Problem origin and discovery"
+  "Контекст и пользователи|Context and users"
+  "Пользовательские сценарии|User scenarios"
+  "Scope|Scope"
+  "Out of scope|Out of scope"
+  "Зафиксированные продуктовые требования|Product requirements"
+  "Нефункциональные требования|Non-functional requirements"
+  "Зависимости, rollout и откат|Dependencies, rollout and rollback"
+  "Спорные моменты и принятые решения|Open questions and decisions"
+  "Допущения и открытые вопросы|Assumptions and open questions"
+  "Acceptance Criteria|Acceptance criteria"
+)
+
+SPEC_SECTIONS=(
+  "Затронутые репозитории и компоненты|Affected repositories and components"
+  "Выбранное техническое решение|Selected technical solution"
+  "Альтернативы и почему не выбраны|Alternatives considered"
+  "Изменения по файлам или модулям|Changes by file or module"
+  "Изменения контрактов и данных|Contract and data changes"
+  "Необходимые проверки|Required checks"
+  "Риски и способы их снижения|Risks and mitigations"
+  "Порядок реализации|Implementation order"
+)
+
 require_file() {
   local path="$1"
   if [[ ! -f "$path" ]]; then
@@ -65,51 +100,57 @@ require_file() {
   fi
 }
 
-require_heading() {
-  local path="$1"
-  local heading="$2"
-  if grep -Eiq "^[[:space:]]*#{1,6}[[:space:]]+${heading}[[:space:]]*$" "$path"; then
-    echo "OK: $heading"
-  else
-    echo "БЛОКЕР: в '$path' отсутствует заголовок: $heading"
+check_artifact() {
+  local path="$1"; shift
+  local item label pattern sec_re re_lc body
+
+  echo "== $path =="
+
+  if grep -q '<!--' "$path"; then
+    echo "БЛОКЕР: остались незаполненные комментарии шаблона (<!-- -->)"
     errors=1
   fi
+
+  for item in "$@"; do
+    label="${item%%|*}"
+    pattern="${item#*|}"
+    sec_re="^[[:space:]]*#{1,6}[[:space:]]+(${label}|${pattern})[[:space:]]*$"
+
+    if ! grep -Eiq "$sec_re" "$path"; then
+      echo "БЛОКЕР: отсутствует заголовок: $label / $pattern"
+      errors=1
+      continue
+    fi
+    echo "OK: $label / $pattern"
+
+    # Содержимое раздела: от заголовка до следующего заголовка,
+    # без HTML-комментариев (в том числе многострочных) и пустых строк.
+    re_lc="$(printf '%s' "$sec_re" | tr '[:upper:]' '[:lower:]')"
+    body="$(awk -v re="$re_lc" '
+      tolower($0) ~ re {insec=1; next}
+      /^[[:space:]]*#/ {insec=0}
+      insec {print}
+    ' "$path" \
+      | sed -e '/^[[:space:]]*<!--/,/-->[[:space:]]*$/d' -e 's/<!--[^>]*-->//g' \
+      | grep -E '[^[:space:]]' || true)"
+
+    if [[ -z "$body" ]]; then
+      echo "БЛОКЕР: раздел пуст: $label / $pattern"
+      errors=1
+    fi
+  done
 }
 
 if [[ -n "$proposal" ]]; then
-  require_file "$proposal" || true
+  if require_file "$proposal"; then
+    check_artifact "$proposal" "${PROPOSAL_SECTIONS[@]}"
+  fi
 fi
 
 if [[ -n "$spec" ]]; then
-  require_file "$spec" || true
-fi
-
-if [[ -f "$proposal" ]]; then
-  echo "== $proposal =="
-  require_heading "$proposal" "Краткое описание задачи"
-  require_heading "$proposal" "Бизнес-цель"
-  require_heading "$proposal" "Происхождение и обнаружение проблемы"
-  require_heading "$proposal" "Контекст и пользователи"
-  require_heading "$proposal" "Пользовательские сценарии"
-  require_heading "$proposal" "Scope"
-  require_heading "$proposal" "Out of scope"
-  require_heading "$proposal" "Зафиксированные продуктовые требования"
-  require_heading "$proposal" "Нефункциональные требования"
-  require_heading "$proposal" "Зависимости, rollout и откат"
-  require_heading "$proposal" "Спорные моменты и принятые решения"
-  require_heading "$proposal" "Допущения и открытые вопросы"
-  require_heading "$proposal" "Acceptance Criteria"
-fi
-
-if [[ -f "$spec" ]]; then
-  echo "== $spec =="
-  require_heading "$spec" "Затронутые репозитории и компоненты"
-  require_heading "$spec" "Выбранное техническое решение"
-  require_heading "$spec" "Изменения по файлам или модулям"
-  require_heading "$spec" "Изменения контрактов и данных"
-  require_heading "$spec" "Необходимые проверки"
-  require_heading "$spec" "Риски и способы их снижения"
-  require_heading "$spec" "Порядок реализации"
+  if require_file "$spec"; then
+    check_artifact "$spec" "${SPEC_SECTIONS[@]}"
+  fi
 fi
 
 if [[ "$errors" -ne 0 ]]; then

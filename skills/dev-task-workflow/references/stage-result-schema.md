@@ -13,7 +13,7 @@
   "status": "ok",
   "summary": "Preflight пройден, 4 файла изменено, 12 тестов зелёные",
   "artifacts": [".../spec.md", "src/app.py", "tests/test_app.py"],
-  "duration_ms": 707000,
+  "duration_ms": null,
   "warnings": ["Генерация схемы не перепроверялась на CI"],
   "error": null,
   "suggested_next": "verification"
@@ -29,7 +29,7 @@
   "status": "error",
   "summary": "Preflight: ветка feature/dev-task/DEV-42 уже существует",
   "artifacts": [],
-  "duration_ms": 12000,
+  "duration_ms": null,
   "warnings": [],
   "error": {
     "code": "preflight_blocked",
@@ -49,7 +49,7 @@
 | `status` | string | `ok`, `blocked`, `error` или `skipped` |
 | `summary` | string | Краткое описание результата для пользователя и `workflow_trace` |
 | `artifacts` | array\<string\> | Созданные или изменённые артефакты; пустой массив, если их нет |
-| `duration_ms` | int | Длительность этапа в миллисекундах |
+| `duration_ms` | int \| null | Опционально; длительность этапа считает оркестратор по паре `started`/итоговой записи `workflow_trace`, значение из файла не требуется |
 | `warnings` | array\<string\> | Неблокирующие замечания; пустой массив, если их нет |
 | `error` | object \| null | Обязателен при `status = error` или `blocked`; иначе `null` |
 | `suggested_next` | string \| null | Куда переходить дальше; см. допустимые значения |
@@ -82,9 +82,9 @@
 
 ## Допустимые `suggested_next`
 
-`approval-proposal`, `approval-spec`, `verification`, `code-review`, `delivery`, `reporting`, `back_to_product_analysis`, `back_to_implementation`, `await_user`, `stop`, `null`.
+`approval-proposal`, `approval-spec`, `verification`, `code-review`, `delivery`, `reporting`, `retrospective`, `back_to_product_analysis`, `back_to_implementation`, `await_user`, `stop`, `null`.
 
-Для `status = ok` `suggested_next` указывает следующий этап по плану (после `reporting` — `null`). Для `status = blocked` или `error` — действие из таблицы выше. Для `status = skipped` — следующий этап по плану (например, `code-review` → `delivery`).
+Для `status = ok` или `skipped` `suggested_next` указывает следующий этап по плану (после `retrospective` — `null`). Для `status = blocked` или `error` — действие из таблицы выше. Для `status = skipped` — следующий этап по плану (например, `code-review` → `delivery`).
 
 ## Соответствие `status` и событий `workflow_trace`
 
@@ -100,4 +100,5 @@
 1. Файл отсутствует или содержит невалидный JSON — считать `status = error`, `error.code = unknown`.
 2. `stage` в файле не совпадает с именем файла или ожидаемым этапом — считать `status = error`, `error.code = unknown`.
 3. `error` не заполнен при `status = error` или `blocked` — считать `status = error`, `error.code = unknown`.
-4. В остальных случаях принять результат как есть и действовать по `suggested_next`.
+4. Отсутствие или невалидное значение `duration_ms` ошибкой не считается: длительность фиксирует оркестратор.
+5. В остальных случаях принять результат как есть и действовать по `suggested_next`.
