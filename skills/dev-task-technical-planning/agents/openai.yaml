@@ -1,6 +1,0 @@
-interface:
-  display_name: "Technical Planning"
-  short_description: "Create and validate a technical plan"
-  default_prompt: "Use $dev-task-technical-planning to prepare a technical plan for this task."
-policy:
-  allow_implicit_invocation: false
